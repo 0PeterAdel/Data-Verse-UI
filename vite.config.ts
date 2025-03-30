@@ -7,4 +7,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  test: {
+    globals: true, // Enable global test functions like describe and it
+    environment: 'node', // Use Node.js environment for testing
+  },
 });

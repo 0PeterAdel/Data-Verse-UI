@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart2, LineChart, PieChart, TrendingUp, Settings2, Download, Wand2, Brain, Share2, RefreshCw } from 'lucide-react';
 import Plot from 'react-plotly.js';
+import { previewData, startProcess, getResults } from '../apiService';
 
 const CHART_TYPES = [
   { id: 'bar', name: 'Bar Chart', icon: BarChart2, description: 'Compare values across categories' },
@@ -14,44 +15,39 @@ export default function Analysis() {
   const [selectedChart, setSelectedChart] = useState('bar');
   const [loading, setLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Mock data for demonstration
-  const data = {
-    bar: {
-      x: ['Category A', 'Category B', 'Category C', 'Category D'],
-      y: [32, 64, 45, 78],
-      type: 'bar',
-      marker: {
-        color: 'rgb(99, 102, 241)',
-        opacity: 0.8,
-      },
-    },
-    line: {
-      x: [1, 2, 3, 4, 5],
-      y: [2, 5, 3, 8, 4],
-      type: 'scatter',
-      mode: 'lines+markers',
-      marker: { color: 'rgb(99, 102, 241)' },
-      line: { width: 3 },
-    },
-    pie: {
-      values: [35, 25, 20, 20],
-      labels: ['Product A', 'Product B', 'Product C', 'Product D'],
-      type: 'pie',
-      marker: {
-        colors: ['rgb(99, 102, 241)', 'rgb(129, 140, 248)', 'rgb(165, 180, 252)', 'rgb(199, 210, 254)'],
-      },
-    },
-    scatter: {
-      x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      y: [2, 4, 3, 5, 4, 7, 6, 8, 7, 9],
-      mode: 'markers',
-      type: 'scatter',
-      marker: { 
-        color: 'rgb(99, 102, 241)',
-        size: 10,
-      },
-    },
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const preview = await previewData();
+        console.log('Preview data:', preview); // Debugging log
+        setData(preview);
+      } catch (err) {
+        console.error('Error fetching preview data:', err); // Debugging log
+        setError('Failed to load data preview.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleProcess = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token'); // Retrieve token from local storage
+      const processResponse = await startProcess(token);
+      const results = await getResults(processResponse.jobId, token);
+      setData(results);
+    } catch (err) {
+      setError('Failed to process data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExport = () => {
@@ -61,6 +57,20 @@ export default function Analysis() {
 
   return (
     <div className="space-y-6">
+      {error && <div className="text-red-500">{error}</div>}
+      <button
+        onClick={handleProcess}
+        disabled={loading}
+        className="px-4 py-2 bg-blue-500 text-white rounded"
+      >
+        {loading ? 'Processing...' : 'Start Processing'}
+      </button>
+      {data && (
+        <div>
+          <h3>Data Preview:</h3>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -157,7 +167,7 @@ export default function Analysis() {
           </div>
           <div className="h-[400px] w-full">
             <Plot
-              data={[data[selectedChart as keyof typeof data]]}
+              data={data && data[selectedChart] ? data[selectedChart] : []} // Fallback to an empty array
               layout={{
                 margin: { t: 20, r: 20, b: 40, l: 40 },
                 paper_bgcolor: 'rgba(0,0,0,0)',

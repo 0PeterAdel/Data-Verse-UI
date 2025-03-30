@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileType, AlertCircle, Loader, Table, Download, Eye, Trash2, Search, Filter } from 'lucide-react';
 import { AutoSizer, List } from 'react-virtualized';
+import { uploadFile, previewData } from '../apiService';
 
 interface FilePreview {
   id: string;
@@ -24,34 +25,25 @@ export default function DataSets() {
   const onDrop = async (acceptedFiles: File[]) => {
     setProcessing(true);
     setError(null);
-
     try {
-      const newFiles = await Promise.all(
+      const uploadedFiles = await Promise.all(
         acceptedFiles.map(async (file) => {
-          if (file.size > 100 * 1024 * 1024) {
-            throw new Error('File size must be less than 100MB');
-          }
-
-          const content = await file.text();
-          const lines = content.split('\n');
-          const columns = lines[0].split(',');
-          const data = lines.slice(1).map(line => line.split(','));
-
+          const response = await uploadFile(file);
+          const preview = await previewData();
           return {
-            id: crypto.randomUUID(),
-            name: file.name,
+            id: response.file.id || crypto.randomUUID(),
+            name: response.file.originalname || file.name,
             size: file.size,
             type: file.type,
-            data,
-            columns,
+            data: preview.data || [],
+            columns: preview.columns || [],
             uploadedAt: new Date(),
           };
         })
       );
-
-      setFiles(prev => [...prev, ...newFiles]);
+      setFiles((prev) => [...prev, ...uploadedFiles]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process files');
+      setError('Failed to upload or preview files.');
     } finally {
       setProcessing(false);
     }
@@ -67,7 +59,7 @@ export default function DataSets() {
     maxSize: 100 * 1024 * 1024,
   });
 
-  const filteredFiles = files.filter(file =>
+  const filteredFiles = files.filter((file) =>
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -147,7 +139,6 @@ export default function DataSets() {
           </motion.button>
         </div>
       </motion.div>
-
       <motion.div
         {...getRootProps()}
         initial={{ opacity: 0, y: 20 }}
@@ -175,7 +166,6 @@ export default function DataSets() {
           </p>
         </motion.div>
       </motion.div>
-
       {processing && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -186,7 +176,6 @@ export default function DataSets() {
           <span>Processing files...</span>
         </motion.div>
       )}
-
       {error && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -197,7 +186,6 @@ export default function DataSets() {
           <span>{error}</span>
         </motion.div>
       )}
-
       {files.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -219,7 +207,6 @@ export default function DataSets() {
           </div>
         </motion.div>
       )}
-
       <AnimatePresence>
         {selectedFile && (
           <motion.div
